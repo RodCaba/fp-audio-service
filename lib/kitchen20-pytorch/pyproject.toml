@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kitchen20-pytorch"
+version = "0.1.0"
+description = "Kitchen20 audio recognition with PyTorch 2.7.0"
+readme = "README.md"
+requires-python = ">=3.8"
+
+dependencies = [
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "numpy>=1.22.0",
+    "pandas>=1.5.0",
+    "matplotlib>=3.5.0",
+    "scikit-learn>=1.0.0",
+    "librosa>=0.9.0",
+    "tqdm>=4.62.0",
+    "onnx>=1.18.0",
+    "onnxruntime>=1.22.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "flake8>=4.0.0",
+    "jupyter>=1.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"kitchen20_pytorch" = "src"}
+packages = ["kitchen20_pytorch"]

@@ -1,0 +1,44 @@
+Metadata-Version: 2.4
+Name: kitchen20-pytorch
+Version: 0.1.0
+Summary: Kitchen20 audio recognition with PyTorch 2.7.0
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: torch>=2.7.0
+Requires-Dist: torchaudio>=2.7.0
+Requires-Dist: numpy>=1.22.0
+Requires-Dist: pandas>=1.5.0
+Requires-Dist: matplotlib>=3.5.0
+Requires-Dist: scikit-learn>=1.0.0
+Requires-Dist: librosa>=0.9.0
+Requires-Dist: tqdm>=4.62.0
+Requires-Dist: onnx>=1.18.0
+Requires-Dist: onnxruntime>=1.22.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: black>=22.0.0; extra == "dev"
+Requires-Dist: isort>=5.10.0; extra == "dev"
+Requires-Dist: flake8>=4.0.0; extra == "dev"
+Requires-Dist: jupyter>=1.0.0; extra == "dev"
+
+# Kitchen20 PyTorch
+
+A modern implementation of the Kitchen20 audio dataset recognition using PyTorch 2.7.0.
+
+## Features
+
+- Audio preprocessing and feature extraction
+- Data augmentation for improved model robustness
+- CNN model architecture for audio classification
+- Training and evaluation scripts
+- Inference API for new audio samples
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/kitchen20-pytorch.git
+cd kitchen20-pytorch
+
+# Install the package
+pip install -e .

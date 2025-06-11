@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+kitchen20_pytorch.egg-info/PKG-INFO
+kitchen20_pytorch.egg-info/SOURCES.txt
+kitchen20_pytorch.egg-info/dependency_links.txt
+kitchen20_pytorch.egg-info/requires.txt
+kitchen20_pytorch.egg-info/top_level.txt

@@ -3,42 +3,44 @@ from torch import nn
 from torch.utils.data import DataLoader
 from kitchen20 import esc
 import kitchen20.utils as U
+from torchaudio import transforms
+input_length = 48000  # Length of audio input in samples
 
 def main():
     # Get training and validation datasets
+    k_20_transforms = []
+    k_20_transforms += [U.padding(input_length // 2)]
+    k_20_transforms += [U.random_crop(input_length)]
+    k_20_transforms += [U.normalize(float(2**16 / 2))]
+    k_20_transforms += [U.random_flip()]
+
+
     k_20_train = esc.Kitchen20(
         folds=[1, 2, 3, 4],
         audio_rate=16000,
-        transforms=[
-            U.random_scale(1.25),
-            U.random_crop(24000),
-            U.normalize(float(2**16 / 2)),
-        ]
+        overwrite=False,
+        transforms=k_20_transforms,
+        use_bc_learning=False
     )
     k_20_val = esc.Kitchen20(
         folds=[5],
         audio_rate=16000,
-        transforms=[
-            U.random_crop(24000),
-            U.normalize(float(2**16 / 2)),
-        ]
+        overwrite=False,
+        transforms=k_20_transforms,
+        use_bc_learning=False
     )
 
     # Create data loaders
     train_loader = DataLoader(
         k_20_train,
-        batch_size=32,
+        batch_size=2,
         shuffle=True,
-        num_workers=4,
-        pin_memory=True
     )
 
     val_loader = DataLoader(
         k_20_val,
-        batch_size=32,
+        batch_size=2,
         shuffle=False,
-        num_workers=4,
-        pin_memory=True
     )
 
     # Define a simple model
@@ -58,7 +60,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-    num_epochs = 20
+    num_epochs = 5
     best_val_loss = float('inf')
 
     # Training loop
@@ -66,7 +68,9 @@ def main():
         model.train()
         running_loss = 0.0
         for batch in train_loader:
-            inputs, labels = batch['audio'].to('cuda'), batch['label'].to('cuda')
+            print(batch)
+            inputs, labels = batch
+            inputs, labels = inputs.to('cuda' if torch.cuda.is_available() else 'cpu'), labels.to('cuda' if torch.cuda.is_available() else 'cpu')
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -82,7 +86,8 @@ def main():
         val_loss = 0.0
         with torch.no_grad():
             for batch in val_loader:
-                inputs, labels = batch['audio'].to('cuda'), batch['label'].to('cuda')
+                inputs, labels = batch
+                inputs, labels = inputs.to('cuda' if torch.cuda.is_available() else 'cpu'), labels.to('cuda' if torch.cuda.is_available() else 'cpu')
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 val_loss += loss.item() * inputs.size(0)

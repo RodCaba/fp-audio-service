@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from src.predictor.predict import AudioPredictor
 from playsound3 import playsound
+from gtts import gTTS
 
 def record_audio(output_file, seconds=5, rate=44100, channels=1, chunk=1024):
         """Record audio from microphone and save to output_file"""
@@ -63,13 +64,6 @@ def main():
             audio_file = output_dir / "audio.wav"
             print(f"\nIteration {iteration}")
 
-            # Play the audio file if it exists
-            if audio_file.exists():
-                print(f"Playing existing audio file: {audio_file}")
-                playsound(str(audio_file))
-            else:
-                print("No existing audio file to play.")
-
             # Record audio
             record_audio(str(audio_file), seconds=5)
             
@@ -81,6 +75,13 @@ def main():
             print("Prediction results:")
             print(f"Class: {predicted_class}, Confidence: {confidence:.2f}")
             print("Top 3 probabilities:", all_probabilities[:3])
+
+            text_to_speak = f"Prediction: {predicted_class}; with confidence {confidence:.2f}"
+            tts = gTTS(text=text_to_speak, lang='en')
+            tts_file = output_dir / "prediction.mp3"
+            tts.save(str(tts_file))
+            print(f"Playing back prediction audio: {tts_file}")
+            playsound(str(tts_file))
 
             print(f"Resting for {rest_time} seconds before next recording...")
             time.sleep(rest_time)

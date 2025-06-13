@@ -75,13 +75,13 @@ def main():
             
             # Run prediction
             print("Running prediction...")
-            results = predictor.predict(str(audio_file))
+            predicted_class, confidence, all_probabilities = predictor.predict(str(audio_file))
             
             # Print results
             print("Prediction results:")
-            for label, probability in results.items():
-                print(f"  {label}: {probability:.4f}")
-            
+            print(f"Class: {predicted_class}, Confidence: {confidence:.2f}")
+            print("Top 3 probabilities:", all_probabilities[:3])
+
             print(f"Resting for {rest_time} seconds before next recording...")
             time.sleep(rest_time)
             

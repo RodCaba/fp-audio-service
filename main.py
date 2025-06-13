@@ -1,108 +1,94 @@
-import torch
-from torch import nn
-from torch.utils.data import DataLoader
-from kitchen20 import esc
-import kitchen20.utils as U
-from torchaudio import transforms
-input_length = 48000  # Length of audio input in samples
+import pyaudio
+import wave
+import time
+import os
+from pathlib import Path
+from src.predictor.predict import AudioPredictor
+from playsound3 import playsound
+
+def record_audio(output_file, seconds=5, rate=44100, channels=1, chunk=1024):
+        """Record audio from microphone and save to output_file"""
+        p = pyaudio.PyAudio()
+
+        # List available audio devices
+        print("Available audio devices:")
+        for i in range(p.get_device_count()):
+            info = p.get_device_info_by_index(i)
+            print(f"Device {i}: {info['name']} (max input channels: {info['maxInputChannels']})")
+        
+        stream = p.open(format=pyaudio.paInt16,
+                        channels=channels,
+                        rate=rate,
+                        input=True,
+                        frames_per_buffer=chunk,
+                    )
+        
+        print(f"Recording for {seconds} seconds...")
+        frames = []
+        
+        for i in range(0, int(rate / chunk * seconds)):
+            data = stream.read(chunk)
+            frames.append(data)
+        
+        print("Recording finished")
+        
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        
+        # Save as WAV file
+        wf = wave.open(output_file, 'wb')
+        wf.setnchannels(channels)
+        wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+        wf.setframerate(rate)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+        
+        print(f"Audio saved to {output_file}")
 
 def main():
-    # Get training and validation datasets
-    k_20_transforms = []
-    k_20_transforms += [U.padding(input_length // 2)]
-    k_20_transforms += [U.random_crop(input_length)]
-    k_20_transforms += [U.normalize(float(2**16 / 2))]
-    k_20_transforms += [U.random_flip()]
+    # Initialize the predictor
+    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exported_models", "model.onnx")
+    predictor = AudioPredictor(model_path)
+    
+    # Create output directory if it doesn't exist
+    output_dir = Path("data", "recorded_audio")
+    output_dir.mkdir(exist_ok=True)
+    
+    try:
+        iteration = 1
+        rest_time = 2  # Time to rest between recordings in seconds
+        
+        while True:
+            audio_file = output_dir / "audio.wav"
+            print(f"\nIteration {iteration}")
 
+            # Play the audio file if it exists
+            if audio_file.exists():
+                print(f"Playing existing audio file: {audio_file}")
+                playsound(str(audio_file))
+            else:
+                print("No existing audio file to play.")
 
-    k_20_train = esc.Kitchen20(
-        folds=[1, 2, 3, 4],
-        audio_rate=16000,
-        overwrite=False,
-        transforms=k_20_transforms,
-        use_bc_learning=False
-    )
-    k_20_val = esc.Kitchen20(
-        folds=[5],
-        audio_rate=16000,
-        overwrite=False,
-        transforms=k_20_transforms,
-        use_bc_learning=False
-    )
-
-    # Create data loaders
-    train_loader = DataLoader(
-        k_20_train,
-        batch_size=2,
-        shuffle=True,
-    )
-
-    val_loader = DataLoader(
-        k_20_val,
-        batch_size=2,
-        shuffle=False,
-    )
-
-    # Define a simple model
-    model = nn.Sequential(
-        nn.Conv1d(1, 16, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-        nn.MaxPool1d(kernel_size=2, stride=2),
-        nn.Conv1d(16, 32, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-        nn.MaxPool1d(kernel_size=2, stride=2),
-        nn.Flatten(),
-        nn.Linear(32 * 6000, 128),  # Adjust input size based on your data
-        nn.ReLU(),
-        nn.Linear(128, len(k_20_train.classes))
-    )
-    model = model.to('cuda' if torch.cuda.is_available() else 'cpu')
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-    num_epochs = 5
-    best_val_loss = float('inf')
-
-    # Training loop
-    for epoch in range(num_epochs):
-        model.train()
-        running_loss = 0.0
-        for batch in train_loader:
-            print(batch)
-            inputs, labels = batch
-            inputs, labels = inputs.to('cuda' if torch.cuda.is_available() else 'cpu'), labels.to('cuda' if torch.cuda.is_available() else 'cpu')
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item() * inputs.size(0)
-
-        epoch_loss = running_loss / len(train_loader.dataset)
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}')
-
-        # Validation
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for batch in val_loader:
-                inputs, labels = batch
-                inputs, labels = inputs.to('cuda' if torch.cuda.is_available() else 'cpu'), labels.to('cuda' if torch.cuda.is_available() else 'cpu')
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                val_loss += loss.item() * inputs.size(0)
-
-        val_loss /= len(val_loader.dataset)
-        print(f'Validation Loss: {val_loss:.4f}')
-
-        # Save the best model
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), 'best_model.pth')
-
-        scheduler.step()
+            # Record audio
+            record_audio(str(audio_file), seconds=5)
+            
+            # Run prediction
+            print("Running prediction...")
+            results = predictor.predict(str(audio_file))
+            
+            # Print results
+            print("Prediction results:")
+            for label, probability in results.items():
+                print(f"  {label}: {probability:.4f}")
+            
+            print(f"Resting for {rest_time} seconds before next recording...")
+            time.sleep(rest_time)
+            
+            iteration += 1
+            
+    except KeyboardInterrupt:
+        print("\nRecording stopped by user")
 
 if __name__ == '__main__':
     main()
-# This script trains a simple CNN on the Kitchen20 dataset using PyTorch.
-# It includes data loading, model definition, training, and validation loops.

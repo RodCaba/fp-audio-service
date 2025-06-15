@@ -50,7 +50,7 @@ def record_audio(output_file, seconds=5, rate=44100, channels=1, chunk=1024):
 def main():
     # Initialize the predictor
     model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exported_models", "model.onnx")
-    predictor = AudioPredictor(model_path)
+    predictor = AudioPredictor(model_path, feature_type="mfcc")
     
     # Create output directory if it doesn't exist
     output_dir = Path("data", "recorded_audio")

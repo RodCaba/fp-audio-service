@@ -36,7 +36,8 @@ def main():
   parser = argparse.ArgumentParser(description="Train a Kitchen20 model")
   parser.add_argument('--data_path', type=str, required=True, help='Path to audio data directory')
   parser.add_argument('--csv_path', type=str, required=True, help='Path to metadata CSV file')
-  
+  parser.add_argument('--feature_type', type=str, default='melspectrogram', choices=['melspectrogram', 'mfcc'], help='Type of audio features to extract')
+
   args = parser.parse_args()
 
   # Set up device
@@ -44,13 +45,13 @@ def main():
   print(f"Using device: {device}")
 
   # Create feature extractors
-  feature_extractor = FeatureExtractor()
-  
+  feature_extractor = FeatureExtractor(feature_type=args.feature_type)
+
   # Create audio transform
   train_transform = AudioTransform(
       feature_extractor=feature_extractor,
-      augmentation=None,  # Define your augmentation here if needed
-      spec_augmentation=None  # Define your spec augmentation here if needed
+      augmentation=None,
+      spec_augmentation=None
   )
   val_transform = AudioTransform(
       feature_extractor=feature_extractor,

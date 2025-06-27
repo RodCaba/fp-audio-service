@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package audio_service;
+
+// Audio processing service
+service AudioService {
+    // Start audio recording and processing
+    rpc StartAudioProcessing(AudioRequest) returns (AudioResponse);
+    
+    // Get the status of audio processing
+    rpc GetProcessingStatus(StatusRequest) returns (StatusResponse);
+    
+    // Health check
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Request message for audio processing
+message AudioRequest {
+    string session_id = 1;           // Unique session identifier
+    int32 recording_duration = 2;    // Duration in seconds
+    string output_format = 3;        // Output format (wav, mp3, etc.)
+}
+
+// Response message for audio processing
+message AudioResponse {
+    string session_id = 1;
+    bool success = 2;
+    string predicted_class = 3;
+    float confidence = 4;
+    string error_message = 5;
+    repeated ClassProbability top_predictions = 6;
+}
+
+// Class probability for detailed results
+message ClassProbability {
+    string class_name = 1;
+    float probability = 2;
+}
+
+// Status request
+message StatusRequest {
+    string session_id = 1;
+}
+
+// Status response
+message StatusResponse {
+    string session_id = 1;
+    string status = 2;  // "idle", "recording", "processing", "completed", "error"
+    string current_operation = 3;
+}
+
+// Health check messages
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+    string status = 1;  // "SERVING", "NOT_SERVING"
+    string message = 2;
+}

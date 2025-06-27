@@ -11,8 +11,8 @@ from gtts import gTTS
 from playsound3 import playsound
 
 from src.predictor.predict import AudioPredictor
-from src.grpc.grpc_generated import audio_service_pb2
-from src.grpc.grpc_generated import audio_service_pb2_grpc
+from src.grpc_generated import audio_service_pb2
+from src.grpc_generated import audio_service_pb2_grpc
 
 
 class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):

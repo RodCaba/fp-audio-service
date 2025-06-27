@@ -5,8 +5,8 @@
 
 python -m grpc_tools.protoc \
     --proto_path=./proto \
-    --python_out=./src/grpc/grpc_generated \
-    --grpc_python_out=./src/grpc/grpc_generated \
+    --python_out=./src/grpc_generated \
+    --grpc_python_out=./src/grpc_generated \
     ./proto/audio_service.proto
 
 # Check if generation was successful
@@ -16,6 +16,6 @@ if [ $? -ne 0 ]; then
 fi
 
 # Fix import paths in generated files
-sed -i 's/import audio_service_pb2/from . import audio_service_pb2/g' ./src/grpc/grpc_generated/audio_service_pb2_grpc.py
+sed -i 's/import audio_service_pb2/from . import audio_service_pb2/g' ./src/grpc_generated/audio_service_pb2_grpc.py
 
 echo "gRPC code generated successfully for Audio service (gRPC server)!"

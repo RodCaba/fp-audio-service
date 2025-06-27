@@ -16,7 +16,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Production stage
-FROM python:3.11-slim
+FROM builder
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -38,7 +38,7 @@ COPY --from=builder /root/.local /home/app/.local
 COPY . .
 
 # Copy only the required proto file
-COPY ../proto/audio_service.proto /tmp/audio_service.proto
+COPY ./proto/audio_service.proto /tmp/audio_service.proto
 
 # Create necessary directories
 RUN mkdir -p data/recorded_audio data/audio exported_models src/grpc_generated && \

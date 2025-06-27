@@ -76,6 +76,10 @@ def main():
             print(f"Class: {predicted_class}, Confidence: {confidence:.2f}")
             print("Top 3 probabilities:", all_probabilities[:3])
 
+            # Play recorded audio   
+            print(f"Playing back recorded audio: {audio_file}")
+            playsound(str(audio_file))
+
             text_to_speak = f"Prediction: {predicted_class}; with confidence {confidence:.2f}"
             tts = gTTS(text=text_to_speak, lang='en')
             tts_file = output_dir / "prediction.mp3"

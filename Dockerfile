@@ -1,10 +1,13 @@
 # Multi-stage build for ARM64/AMD64 compatibility
 FROM python:3.11-slim AS builder
 
-# Install build dependencies
+# Install build dependencies, add audio libraries
 RUN apt-get update && apt-get install -y \
     build-essential \
     portaudio19-dev \
+    libasound2-dev \
+    libpulse-dev \
+    libjack-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,15 +21,22 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Production stage
 FROM builder
 
-# Install runtime dependencies
+# Install runtime dependencies and audio libraries
 RUN apt-get update && apt-get install -y \
     portaudio19-dev \
     alsa-utils \
+    pulseaudio \
+    pulseaudio-utils \
+    libasound2 \
+    libasound2-plugins \
+    libpulse0 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash app
+# Create audio group and non-root user for security
+RUN groupadd -r audio || true && \
+    groupadd -r app || true && \
+    useradd --create-home --shell /bin/bash -g audio -G app app
 
 # Set working directory
 WORKDIR /app
@@ -56,12 +66,21 @@ RUN python -m grpc_tools.protoc \
     /tmp/audio_service.proto && \
     sed -i 's/import audio_service_pb2/from . import audio_service_pb2/g' ./src/grpc_generated/audio_service_pb2_grpc.py
 
+# Create audio configuration
+RUN mkdir -p /home/app/.config/pulse && \
+    echo "default-server = unix:/run/user/1000/pulse/native" > /home/app/.config/pulse/client.conf && \
+    chown -R app:audio /home/app/.config
+
 # Switch to non-root user
 USER app
 
+# Configure audio environment
+ENV PULSE_RUNTIME_PATH=/run/user/1000/pulse
+ENV PULSE_COOKIE=/home/app/.config/pulse/cookie
+
 # Add local packages to PATH
 ENV PATH=/home/app/.local/bin:$PATH
-ENV PYTHONPATH=/app/src:$PYTHONPATH
+ENV PYTHONPATH=/app/src
 
 # Expose gRPC port
 EXPOSE 50051

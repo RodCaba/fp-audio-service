@@ -10,6 +10,8 @@ import wave
 from gtts import gTTS
 from playsound3 import playsound
 
+from grpc_reflection.v1alpha import reflection
+
 from src.predictor.predict import AudioPredictor
 from src.grpc_generated import audio_service_pb2
 from src.grpc_generated import audio_service_pb2_grpc
@@ -67,13 +69,31 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
             
             # Create response with top predictions
             top_predictions = []
-            for class_name, prob in all_probabilities[:3]:  # Top 3
-                top_predictions.append(
-                    audio_service_pb2.ClassProbability(
-                        class_name=class_name,
-                        probability=float(prob)
+            import numpy as np
+            
+            if hasattr(self.predictor, 'class_names') and self.predictor.class_names:
+                # Get top 3 indices
+                top_indices = np.argsort(all_probabilities)[-3:][::-1]
+                for idx in top_indices:
+                    if idx < len(self.predictor.class_names):
+                        class_name = self.predictor.class_names[idx]
+                        probability = float(all_probabilities[idx])
+                        top_predictions.append(
+                            audio_service_pb2.ClassProbability(
+                                class_name=class_name,
+                                probability=probability
+                            )
+                        )
+            else:
+                # Fallback if class_names not available
+                top_indices = np.argsort(all_probabilities)[-3:][::-1]
+                for i, idx in enumerate(top_indices):
+                    top_predictions.append(
+                        audio_service_pb2.ClassProbability(
+                            class_name=f"class_{idx}",
+                            probability=float(all_probabilities[idx])
+                        )
                     )
-                )
             
             # Generate and play TTS feedback
             self._generate_tts_feedback(predicted_class, confidence, session_id)
@@ -213,6 +233,13 @@ def serve():
     audio_service_pb2_grpc.add_AudioServiceServicer_to_server(
         AudioServiceImpl(), server
     )
+
+    # Enable gRPC reflection
+    SERVICE_NAMES = (
+        'audio_service.AudioService',  # Use the full service name from proto
+        reflection.SERVICE_NAME,
+    )
+    reflection.enable_server_reflection(SERVICE_NAMES, server)
     
     listen_addr = f'[::]:{port}'
     server.add_insecure_port(listen_addr)

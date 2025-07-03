@@ -8,7 +8,7 @@ from pathlib import Path
 import pyaudio
 import wave
 from gtts import gTTS
-from playsound3 import playsound
+import pygame
 
 from grpc_reflection.v1alpha import reflection
 
@@ -32,6 +32,13 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
         # Session management
         self.active_sessions = {}
         self.session_lock = threading.Lock()
+        
+        # Initialize pygame mixer for audio playback
+        try:
+            pygame.mixer.init()
+            print("Pygame mixer initialized successfully")
+        except Exception as e:
+            print(f"Warning: Could not initialize pygame mixer: {e}")
         
         print(f"Audio service initialized with model: {model_path}")
     
@@ -207,9 +214,51 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
             tts_file = self.output_dir / f"prediction_{session_id}.mp3"
             tts.save(str(tts_file))
             print(f"Playing back prediction audio: {tts_file}")
-            playsound(str(tts_file))
+            self._play_audio_with_pygame(str(tts_file))
         except Exception as e:
             print(f"TTS feedback failed: {e}")
+    
+    def _play_audio_with_pygame(self, audio_file):
+        """Play audio file using pygame"""
+        try:
+            # Initialize pygame mixer if not already initialized
+            if not pygame.mixer.get_init():
+                # Try different audio drivers for better compatibility
+                audio_drivers = ['alsa', 'pulse', 'oss', 'dummy']
+                mixer_initialized = False
+                
+                for driver in audio_drivers:
+                    try:
+                        import os
+                        os.environ['SDL_AUDIODRIVER'] = driver
+                        pygame.mixer.init()
+                        print(f"Audio initialized with {driver} driver")
+                        mixer_initialized = True
+                        break
+                    except Exception as e:
+                        print(f"Failed to initialize audio with {driver}: {e}")
+                        continue
+                
+                if not mixer_initialized:
+                    print("No audio driver available - running in silent mode")
+                    return
+            
+            # Load and play the audio file
+            pygame.mixer.music.load(audio_file)
+            pygame.mixer.music.play()
+            
+            # Wait for playback to complete
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.1)
+                
+        except Exception as e:
+            print(f"Pygame audio playback failed: {e}")
+        finally:
+            # Clean up
+            try:
+                pygame.mixer.music.stop()
+            except:
+                pass
     
     def _update_session_status(self, session_id, status):
         """Update session status"""

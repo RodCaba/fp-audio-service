@@ -23,7 +23,7 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
         model_path = os.path.join( 
                                   "exported_models", "model.onnx")
         print(f"Loading model from: {model_path}")
-        self.predictor = AudioPredictor(model_path, feature_type="mfcc")
+        self.predictor = AudioPredictor(model_path, feature_type="melspectrogram")
         
         # Create output directory if it doesn't exist
         self.output_dir = Path("data", "recorded_audio")
@@ -335,19 +335,25 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
     
     def _list_audio_devices(self):
         """List available audio devices for debugging"""
+        p = pyaudio.PyAudio()
         try:
-            import pyaudio
-            p = pyaudio.PyAudio()
             print("Available audio devices:")
             for i in range(p.get_device_count()):
-                try:
-                    info = p.get_device_info_by_index(i)
-                    print(f"  Device {i}: {info['name']} - Inputs: {info['maxInputChannels']}, Outputs: {info['maxOutputChannels']}")
-                except Exception as e:
-                    print(f"  Device {i}: Error getting info - {e}")
-            p.terminate()
+                device_info = p.get_device_info_by_index(i)
+                device_type = []
+                if device_info['maxInputChannels'] > 0:
+                    device_type.append('INPUT')
+                if device_info['maxOutputChannels'] > 0:
+                    device_type.append('OUTPUT')
+                
+                print(f"  Device {i}: {device_info['name']} ({'/'.join(device_type)})")
+                print(f"    Max input channels: {device_info['maxInputChannels']}")
+                print(f"    Max output channels: {device_info['maxOutputChannels']}")
+                print(f"    Default sample rate: {device_info['defaultSampleRate']}")
         except Exception as e:
             print(f"Error listing audio devices: {e}")
+        finally:
+            p.terminate()
 
 
 def serve():

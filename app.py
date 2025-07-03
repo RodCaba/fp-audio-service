@@ -35,12 +35,33 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
         
         # Initialize pygame mixer for audio playback
         try:
+            # Set SDL audio driver to avoid ALSA errors
+            os.environ['SDL_AUDIODRIVER'] = 'pulse'  # Try PulseAudio first
+            pygame.mixer.pre_init(frequency=22050, size=-16, channels=2, buffer=4096)
             pygame.mixer.init()
             print("Pygame mixer initialized successfully")
         except Exception as e:
-            print(f"Warning: Could not initialize pygame mixer: {e}")
+            print(f"Warning: Could not initialize pygame mixer with PulseAudio: {e}")
+            try:
+                # Fallback to ALSA
+                os.environ['SDL_AUDIODRIVER'] = 'alsa'
+                pygame.mixer.pre_init(frequency=22050, size=-16, channels=2, buffer=4096)
+                pygame.mixer.init()
+                print("Pygame mixer initialized with ALSA")
+            except Exception as e2:
+                print(f"Warning: Could not initialize pygame mixer with ALSA: {e2}")
+                try:
+                    # Final fallback to dummy driver (no audio output)
+                    os.environ['SDL_AUDIODRIVER'] = 'dummy'
+                    pygame.mixer.init()
+                    print("Pygame mixer initialized in silent mode (dummy driver)")
+                except Exception as e3:
+                    print(f"Warning: Could not initialize any audio driver: {e3}")
         
         print(f"Audio service initialized with model: {model_path}")
+        
+        # List available audio devices for debugging
+        self._list_audio_devices()
     
     def StartAudioProcessing(self, request, context):
         """Start audio recording and processing"""
@@ -170,23 +191,55 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
                 message=f"Health check failed: {str(e)}"
             )
     
-    def _record_audio(self, output_file, seconds=5, rate=44100, channels=1, chunk=1024):
+    def _record_audio(self, output_file, seconds=5, rate=44100, channels=1, chunk=4096):
         """Record audio from microphone and save to output_file"""
         p = pyaudio.PyAudio()
         
         try:
+            # Find the USB audio device (UM02)
+            input_device_index = None
+            for i in range(p.get_device_count()):
+                device_info = p.get_device_info_by_index(i)
+                if 'UM02' in device_info['name'] or 'USB Audio' in device_info['name']:
+                    if device_info['maxInputChannels'] > 0:
+                        input_device_index = i
+                        print(f"Using audio device: {device_info['name']} (index: {i})")
+                        break
+            
+            # If no USB device found, use default input device
+            if input_device_index is None:
+                input_device_index = p.get_default_input_device_info()['index']
+                print(f"Using default input device (index: {input_device_index})")
+            
+            # Open stream with error handling for buffer overflow
             stream = p.open(format=pyaudio.paInt16,
                             channels=channels,
                             rate=rate,
                             input=True,
-                            frames_per_buffer=chunk)
+                            input_device_index=input_device_index,
+                            frames_per_buffer=chunk,
+                            start=False)  # Don't start immediately
             
             print(f"Recording for {seconds} seconds...")
             frames = []
             
+            # Start the stream
+            stream.start_stream()
+            
+            # Record with exception handling for overflow
             for i in range(0, int(rate / chunk * seconds)):
-                data = stream.read(chunk)
-                frames.append(data)
+                try:
+                    data = stream.read(chunk, exception_on_overflow=False)
+                    frames.append(data)
+                except IOError as e:
+                    if e.errno == pyaudio.paInputOverflowed:
+                        # Handle input overflow by skipping this chunk
+                        print(f"Input overflow detected, skipping chunk {i}")
+                        # Create silence for the missed chunk
+                        silence = b'\x00' * (chunk * 2)  # 2 bytes per sample for paInt16
+                        frames.append(silence)
+                    else:
+                        raise e
             
             print("Recording finished")
             
@@ -203,6 +256,23 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
             
             print(f"Audio saved to {output_file}")
             
+        except Exception as e:
+            print(f"Recording error: {e}")
+            # Create a minimal silence file if recording fails completely
+            try:
+                wf = wave.open(output_file, 'wb')
+                wf.setnchannels(channels)
+                wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+                wf.setframerate(rate)
+                # Write 1 second of silence
+                silence_frames = int(rate * 1)
+                silence_data = b'\x00' * (silence_frames * 2)
+                wf.writeframes(silence_data)
+                wf.close()
+                print(f"Created silence file due to recording error: {output_file}")
+            except Exception as fallback_error:
+                print(f"Failed to create fallback audio file: {fallback_error}")
+                raise e
         finally:
             p.terminate()
     
@@ -221,35 +291,25 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
     def _play_audio_with_pygame(self, audio_file):
         """Play audio file using pygame"""
         try:
-            # Initialize pygame mixer if not already initialized
+            # Check if pygame mixer is initialized
             if not pygame.mixer.get_init():
-                # Try different audio drivers for better compatibility
-                audio_drivers = ['alsa', 'pulse', 'oss', 'dummy']
-                mixer_initialized = False
-                
-                for driver in audio_drivers:
-                    try:
-                        import os
-                        os.environ['SDL_AUDIODRIVER'] = driver
-                        pygame.mixer.init()
-                        print(f"Audio initialized with {driver} driver")
-                        mixer_initialized = True
-                        break
-                    except Exception as e:
-                        print(f"Failed to initialize audio with {driver}: {e}")
-                        continue
-                
-                if not mixer_initialized:
-                    print("No audio driver available - running in silent mode")
-                    return
+                print("Pygame mixer not initialized - skipping audio playback")
+                return
             
             # Load and play the audio file
             pygame.mixer.music.load(audio_file)
             pygame.mixer.music.play()
             
-            # Wait for playback to complete
-            while pygame.mixer.music.get_busy():
+            # Wait for playback to complete with timeout
+            max_wait_time = 30  # Maximum wait time in seconds
+            wait_time = 0
+            while pygame.mixer.music.get_busy() and wait_time < max_wait_time:
                 time.sleep(0.1)
+                wait_time += 0.1
+                
+            if wait_time >= max_wait_time:
+                print("Audio playback timeout - stopping")
+                pygame.mixer.music.stop()
                 
         except Exception as e:
             print(f"Pygame audio playback failed: {e}")
@@ -272,6 +332,22 @@ class AudioServiceImpl(audio_service_pb2_grpc.AudioServiceServicer):
             if session_id in self.active_sessions:
                 del self.active_sessions[session_id]
                 print(f"Cleaned up session: {session_id}")
+    
+    def _list_audio_devices(self):
+        """List available audio devices for debugging"""
+        try:
+            import pyaudio
+            p = pyaudio.PyAudio()
+            print("Available audio devices:")
+            for i in range(p.get_device_count()):
+                try:
+                    info = p.get_device_info_by_index(i)
+                    print(f"  Device {i}: {info['name']} - Inputs: {info['maxInputChannels']}, Outputs: {info['maxOutputChannels']}")
+                except Exception as e:
+                    print(f"  Device {i}: Error getting info - {e}")
+            p.terminate()
+        except Exception as e:
+            print(f"Error listing audio devices: {e}")
 
 
 def serve():

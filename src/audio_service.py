@@ -3,7 +3,7 @@ from src.predictor.predict import AudioPredictor
 
 
 import pyaudio
-import pygame
+from playsound3 import playsound
 from gtts import gTTS
 
 
@@ -30,31 +30,6 @@ class AudioService(audio_service_pb2_grpc.AudioServiceServicer):
         # Session management
         self.active_sessions = {}
         self.session_lock = threading.Lock()
-
-        # Initialize pygame mixer for audio playback
-        try:
-            # Set SDL audio driver to avoid ALSA errors
-            os.environ['SDL_AUDIODRIVER'] = 'pulse'  # Try PulseAudio first
-            pygame.mixer.pre_init(frequency=22050, size=-16, channels=2, buffer=4096)
-            pygame.mixer.init()
-            print("Pygame mixer initialized successfully")
-        except Exception as e:
-            print(f"Warning: Could not initialize pygame mixer with PulseAudio: {e}")
-            try:
-                # Fallback to ALSA
-                os.environ['SDL_AUDIODRIVER'] = 'alsa'
-                pygame.mixer.pre_init(frequency=22050, size=-16, channels=2, buffer=4096)
-                pygame.mixer.init()
-                print("Pygame mixer initialized with ALSA")
-            except Exception as e2:
-                print(f"Warning: Could not initialize pygame mixer with ALSA: {e2}")
-                try:
-                    # Final fallback to dummy driver (no audio output)
-                    os.environ['SDL_AUDIODRIVER'] = 'dummy'
-                    pygame.mixer.init()
-                    print("Pygame mixer initialized in silent mode (dummy driver)")
-                except Exception as e3:
-                    print(f"Warning: Could not initialize any audio driver: {e3}")
 
         print(f"Audio service initialized with model: {model_path}")
 
@@ -282,41 +257,9 @@ class AudioService(audio_service_pb2_grpc.AudioServiceServicer):
             tts_file = self.output_dir / f"prediction_{session_id}.mp3"
             tts.save(str(tts_file))
             print(f"Playing back prediction audio: {tts_file}")
-            self._play_audio_with_pygame(str(tts_file))
+            playsound(str(tts_file))
         except Exception as e:
             print(f"TTS feedback failed: {e}")
-
-    def _play_audio_with_pygame(self, audio_file):
-        """Play audio file using pygame"""
-        try:
-            # Check if pygame mixer is initialized
-            if not pygame.mixer.get_init():
-                print("Pygame mixer not initialized - skipping audio playback")
-                return
-
-            # Load and play the audio file
-            pygame.mixer.music.load(audio_file)
-            pygame.mixer.music.play()
-
-            # Wait for playback to complete with timeout
-            max_wait_time = 30  # Maximum wait time in seconds
-            wait_time = 0
-            while pygame.mixer.music.get_busy() and wait_time < max_wait_time:
-                time.sleep(0.1)
-                wait_time += 0.1
-
-            if wait_time >= max_wait_time:
-                print("Audio playback timeout - stopping")
-                pygame.mixer.music.stop()
-
-        except Exception as e:
-            print(f"Pygame audio playback failed: {e}")
-        finally:
-            # Clean up
-            try:
-                pygame.mixer.music.stop()
-            except:
-                pass
 
     def _update_session_status(self, session_id, status):
         """Update session status"""

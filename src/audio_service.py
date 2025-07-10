@@ -257,7 +257,7 @@ class AudioService(audio_service_pb2_grpc.AudioServiceServicer):
             tts_file = self.output_dir / f"prediction_{session_id}.mp3"
             tts.save(str(tts_file))
             print(f"Playing back prediction audio: {tts_file}")
-            playsound(str(tts_file))
+            os.system("vlc --play-and-exit " + str(tts_file))  # Use VLC for playback
         except Exception as e:
             print(f"TTS feedback failed: {e}")
 

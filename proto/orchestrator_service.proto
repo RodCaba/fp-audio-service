@@ -4,6 +4,7 @@ package orchestrator_service;
 
 import "imu_service.proto";
 import "rfid_service.proto";
+import "audio_service.proto";
 
 service OrchestratorService {
   // HealthCheck is used to check the health of the orchestrator service.
@@ -16,6 +17,9 @@ service OrchestratorService {
   rpc ReceiveIMUData(imu_service.IMUPayload) returns (imu_service.IMUPayloadResponse);
   // Receive RFID data from RFID sensor
   rpc ReceiveRFIDData(rfid_service.RFIDPayload) returns (rfid_service.RFIDPayloadResponse);
+  // Receive audio data from audio service
+  rpc ReceiveAudioData(audio_service.AudioPayload) returns (audio_service.AudioPayloadResponse);
+
 }
 
 message HealthCheckRequest {}

@@ -3,6 +3,7 @@ from src.audio_service import AudioService
 from src.data_serializer import DataSerializer
 import time
 import logging
+from fp_orchestrator_utils import OrchestratorClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,6 +12,10 @@ def main():
     # Initialize audio service
     audio_service = AudioService()
     data_serializer = DataSerializer()
+    orchestrator_client = OrchestratorClient(
+        "localhost:50051",
+        30
+    )
     # Create output directory if it doesn't exist
     output_dir = Path("data", "recorded_audio")
     output_dir.mkdir(exist_ok=True)
@@ -52,9 +57,13 @@ def main():
             # Verify payload integrity
             if data_serializer._verify_payload(payload):
                 logger.info("Payload verified successfully")
+                # Send payload to orchestrator
+                response = orchestrator_client.send_audio_data(payload)
+                if response.status == "success":
+                    logger.info(f"Audio data sent successfully: {response.message}")
             else:
                 logger.error("Payload verification failed")
-                
+
             logger.info(f"Audio processing completed for iteration {iteration}")
             iteration += 1
             

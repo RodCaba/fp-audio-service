@@ -11,4 +11,4 @@ protobuf==6.31.1
 grpcio-reflection==1.73.1
 
 # Orchestrator tools
-fp-orchestrator-utils==0.2.0
+fp-orchestrator-utils==0.3.0

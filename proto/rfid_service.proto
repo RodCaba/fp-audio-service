@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package rfid_service;
+
+// The RFIDService defines the RPC methods for interacting with RFID sensor.
+service RFIDService {
+  // HealthCheck is used to check the health of the RFID service.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  
+  // SendRFIDPayload is used to send RFID data from a device to the server.
+  rpc SendRFIDPayload(RFIDPayload) returns (RFIDPayloadResponse);
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1; // e.g., "healthy", "unhealthy"
+  string message = 2; // Additional information about the health status
+}
+
+message RFIDPayload {
+  string device_id = 1;
+  repeated string tags = 2; // List of RFID tags
+  int32 current_tags = 3; // Current count of tags read
+}
+
+message RFIDPayloadResponse {
+  string device_id = 1;
+  string status = 2; // e.g., "success", "error"
+}

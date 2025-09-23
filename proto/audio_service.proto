@@ -2,57 +2,63 @@ syntax = "proto3";
 
 package audio_service;
 
-// Audio processing service
+// The AudioService defines the RPC methods for interacting with the audio processing system.
 service AudioService {
-    // Start audio recording and processing
-    rpc StartAudioProcessing(AudioRequest) returns (AudioResponse);
-    
-    // Get the status of audio processing
-    rpc GetProcessingStatus(StatusRequest) returns (StatusResponse);
-    
-    // Health check
-    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  // HealthCheck is used to check the health of the audio service.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  // ProcessAudioPayload is used to send processed audio data from a device to the cloud storage.
+  rpc ProcessAudioPayload(AudioPayload) returns (AudioPayloadResponse);
 }
 
-// Request message for audio processing
-message AudioRequest {
-    string session_id = 1;           // Unique session identifier
-    int32 recording_duration = 2;    // Duration in seconds
-    string output_format = 3;        // Output format (wav, mp3, etc.)
+// The AudioPayload message contains audio data and metadata.
+message AudioPayload {
+  string session_id = 1;
+  int32 sample_rate = 2; // Sample rate in Hz
+  int32 channels = 3;
+  // Feature extraction results
+  AudioFeature features = 4;
+  // Processing parameters
+  ProcessingParameters parameters = 5;
 }
 
-// Response message for audio processing
-message AudioResponse {
-    string session_id = 1;
-    bool success = 2;
-    string predicted_class = 3;
-    float confidence = 4;
-    string error_message = 5;
-    repeated ClassProbability top_predictions = 6;
+message AudioFeature {
+  string feature_type = 1;
+  repeated int32 feature_shape = 2;
+  bytes feature_data = 3; // Serialized feature data (e.g., Mel-spectrogram, MFCCs)
+  FeatureParameters feature_parameters = 4; // Additional parameters for the feature extraction
+  string data_type = 5; // e.g., "float32", "int16"
 }
 
-// Class probability for detailed results
-message ClassProbability {
-    string class_name = 1;
-    float probability = 2;
+message FeatureParameters {
+  int32 n_fft = 1; // Number of frequency bins
+  int32 hop_length = 2;
+  int32 n_mels = 3; // Number of Mel bands
+  int32 f_min = 4; // Minimum frequency
+  int32 f_max = 5; // Maximum frequency
+  int32 target_sample_rate = 6; // Target sample rate for the feature extraction
+  float power = 7; // Power scaling factor for the feature extraction
 }
 
-// Status request
-message StatusRequest {
-    string session_id = 1;
+message ProcessingParameters {
+  int32 target_sample_rate = 1;
+  int32 target_length = 2; // Target length in seconds
+  bool normalize = 3; // Whether audio was normalized
+  string normalization_method = 4; // e.g., "min-max", "z-score"
+  string trim_strategy = 5; // e.g., "none", "silence", "energy"
 }
 
-// Status response
-message StatusResponse {
-    string session_id = 1;
-    string status = 2;  // "idle", "recording", "processing", "completed", "error"
-    string current_operation = 3;
+// The AudioPayloadResponse message is used to return the result of processing an audio payload.
+message AudioPayloadResponse {
+  string session_id = 1;
+  string status = 2; // e.g., "success", "error"
+  string message = 3; // Additional information about the processing result
 }
 
-// Health check messages
+// The HealthCheckRequest message is used to check the health of the audio service.
 message HealthCheckRequest {}
 
+// The HealthCheckResponse message is used to return the health status of the audio service.
 message HealthCheckResponse {
-    string status = 1;  // "SERVING", "NOT_SERVING"
-    string message = 2;
+  string status = 1; // e.g., "healthy", "unhealthy"
+  string message = 2; // Additional information about the health status
 }
